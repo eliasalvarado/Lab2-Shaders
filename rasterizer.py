@@ -7,7 +7,7 @@ height = 500
 
 rend = Renderer(width, height)
 rend.vertexShader = shaders.vertexShader
-rend.fragmentShader = shaders.flatShader
+rend.fragmentShader = shaders.customShader
 
 scaleDim = 100
 

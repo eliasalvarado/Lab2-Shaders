@@ -188,7 +188,11 @@ class Renderer(object):
         self.glLine(v2, v0, clr or self.currColor)
 
 
-    def glTriangleBC(self, A, B, C, vta, vtb, vtc, normal):
+    def glTriangleBC(self, verts, texCoords, normals):
+
+        A = verts[0]
+        B = verts[1]
+        C = verts[2]
 
         minX = round(min(A[0], B[0], C[0]))
         minY = round(min(A[1], B[1], C[1]))
@@ -209,14 +213,12 @@ class Renderer(object):
 
                         if(z < self.zBuffer[x][y]):
                             self.zBuffer[x][y] = z
-
-                            uvs = [u * vta[0] + v * vtb[0] + w * vtc[0],
-                                u * vta[1] + v * vtb[1] + w * vtc[1]]
                             
                             if (self.fragmentShader != None):
-                                colorP = self.fragmentShader(texCoords = uvs, 
+                                colorP = self.fragmentShader(texCoords = texCoords, 
                                                             texture = self.activeTexture,
-                                                            triangleNormal = normal,
+                                                            normals = normals,
+                                                            bCoords = bCoords,
                                                             dLight = self.directionalLight)
                                 self.glPoint(x, y, color(colorP[0], colorP[1], colorP[2]))
                             else:
@@ -228,21 +230,29 @@ class Renderer(object):
             self.vertexBuffer.append(v)
 
 
-    def glPrimitiveAssembly(self, tVerts, tTexCoords, normals):
+    def glPrimitiveAssembly(self, tVerts, tTexCoords, tNormals):
         primitives = []
 
         if (self.primitiveType == triangles):
             for i in range(0, len(tVerts), 3):
                 triangle = []
-                triangle.append(tVerts[i])
-                triangle.append(tVerts[i + 1])
-                triangle.append(tVerts[i + 2])
 
-                triangle.append(tTexCoords[i])
-                triangle.append(tTexCoords[i + 1])
-                triangle.append(tTexCoords[i + 2])
+                verts = []
+                verts.append(tVerts[i])
+                verts.append(tVerts[i + 1])
+                verts.append(tVerts[i + 2])
 
-                triangle.append(normals[int(i / 3)])
+                texCoords = []
+                texCoords.append(tTexCoords[i])
+                texCoords.append(tTexCoords[i + 1])
+                texCoords.append(tTexCoords[i + 2])
+
+                normals = []
+                normals.append(tNormals[i])
+                normals.append(tNormals[i + 1])
+                normals.append(tNormals[i + 2])
+
+                triangle = [verts, texCoords, normals]
 
                 primitives.append(triangle)
             
@@ -275,14 +285,6 @@ class Renderer(object):
 
                 if vertCount == 4:
                     v3 = model.vertices[face[3][0] - 1]
-
-                normal0 = cross(subtractVectors(v1, v0), subtractVectors(v2, v0))
-                normal0 = normVector(normal0)
-                normals.append(normal0)
-                if vertCount == 4:
-                    normal1 = cross(subtractVectors(v2, v0), subtractVectors(v3, v0))
-                    normal1 = normVector(normal1)
-                    normals.append(normal1)
                 
                 if self.vertexShader:
                     v0 = self.vertexShader(v0, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix)
@@ -312,12 +314,27 @@ class Renderer(object):
                     tCoords.append(vt0)
                     tCoords.append(vt2)
                     tCoords.append(vt3)
+
+
+                vn0 = model.normals[face[0][2] - 1]
+                vn1 = model.normals[face[1][2] - 1]
+                vn2 = model.normals[face[2][2] - 1]
+                if vertCount == 4:
+                    vt3 = model.normals[face[3][2] - 1]
+
+                normals.append(vn0)
+                normals.append(vn1)
+                normals.append(vn2)
+                if vertCount == 4:
+                    normals.append(vn0)
+                    normals.append(vn2)
+                    normals.append(vn3)
         
         primitives = self.glPrimitiveAssembly(tVerts, tCoords, normals)
 
         for prim in primitives:
             if (self.primitiveType == triangles):
-                    self.glTriangleBC(prim[0], prim[1], prim[2], prim[3], prim[4], prim[5], prim[6])
+                    self.glTriangleBC(prim[0], prim[1], prim[2])
 
 
     def rotationMatCalc(self, t, w, a):
