@@ -38,15 +38,19 @@ class Model(object):
         self.translate = translate
         self.rotate = rotate
         self.scale = scale
+
+        self.texture = []
     
     def loadTexture(self, texName):
-        self.texture = Texture(texName)
+        self.texture.append(Texture(texName))
+
 
 class Renderer(object):
     def __init__(self, width, height):
         self.width = width
         self.height = height
 
+        #self.glClearColor(0.5, 0.5, 0.5)
         self.glClearColor(0, 0, 0)
         self.glClear()
 
@@ -57,7 +61,7 @@ class Renderer(object):
         self.primitiveType = triangles
         self.vertexBuffer = []
 
-        self.activeTexture = None
+        self.activeTextures = []
 
         self.objects = []
 
@@ -216,10 +220,12 @@ class Renderer(object):
                             
                             if (self.fragmentShader != None):
                                 colorP = self.fragmentShader(texCoords = texCoords, 
-                                                            texture = self.activeTexture,
+                                                            textures = self.activeTextures,
                                                             normals = normals,
                                                             bCoords = bCoords,
-                                                            dLight = self.directionalLight)
+                                                            dLight = self.directionalLight,
+                                                            camMatrix = self.camMatrix,
+                                                            vertex = [A, B, C])
                                 self.glPoint(x, y, color(colorP[0], colorP[1], colorP[2]))
                             else:
                                 self.glPoint(x, y, self.currColor)
@@ -259,9 +265,10 @@ class Renderer(object):
         return primitives
 
 
-    def glLoadModel(self, filename, texName, translate = (0, 0, 0), rotate = (0, 0, 0), scale = (1, 1, 1)):
+    def glLoadModel(self, filename, texNames, translate = (0, 0, 0), rotate = (0, 0, 0), scale = (1, 1, 1)):
         model = Model(filename, translate, rotate, scale)
-        model.loadTexture(texName)
+        for texName in texNames:
+            model.loadTexture(texName)
 
         self.objects.append(model)
 
@@ -272,7 +279,7 @@ class Renderer(object):
         normals = []
 
         for model in self.objects:
-            self.activeTexture = model.texture
+            self.activeTextures = model.texture
             mMatrix = self.glModelMatrix(model.translate, model.rotate, model.scale)
             
 
@@ -320,7 +327,7 @@ class Renderer(object):
                 vn1 = model.normals[face[1][2] - 1]
                 vn2 = model.normals[face[2][2] - 1]
                 if vertCount == 4:
-                    vt3 = model.normals[face[3][2] - 1]
+                    vn3 = model.normals[face[3][2] - 1]
 
                 normals.append(vn0)
                 normals.append(vn1)
@@ -365,7 +372,7 @@ class Renderer(object):
 
 
     def glLookAt(self, camPos = (0, 0, 0), eyePos = (0, 0, 0)):
-        forward = subtractVectors([camPos, eyePos])
+        forward = subtractVectors(camPos, eyePos)
         forward = normVector(forward)
 
         wordUp = (0, 1, 0)

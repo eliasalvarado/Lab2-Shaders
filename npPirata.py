@@ -117,6 +117,12 @@ def vectorNegative(vector):
     negative = [-x for x in vector]
     return negative
 
+def multVectorScalar(vector, scalar):
+    result = [scalar * value for value in vector]
+    return result
+
+
+
 #prueba = [[1, 1, 0, 0], [0, -1, -2, 0], [0, 0, 1, -1], [0, 0, 0, 1]]
 #print(invertMatrix(prueba))
 

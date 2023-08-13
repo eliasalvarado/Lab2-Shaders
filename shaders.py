@@ -1,4 +1,4 @@
-from npPirata import multMV, multMM, dot, vectorNegative, normVector
+from npPirata import multMV, multMM, dot, vectorNegative, normVector, multVectorScalar, subtractVectors
 
 def vertexShader(vertex, **kwargs):
     modelMatrix = kwargs["modelMatrix"]
@@ -32,27 +32,9 @@ def fragmentShader(**kwargs):
 
     return color
 
-def flatShader(**kwargs):
-    """ dLight = kwargs["dLight"]
-    normal= kwargs["triangleNormal"]
-
-    dLight= vectorNegative(dLight)
-    intensity= dot(normal, dLight)
-
-    color = [0, 0, 0]
-    color[0] *= intensity
-    color[1] *= intensity
-    color[2] *= intensity
-
-    if intensity > 0:
-        return color
-
-    else:
-        return [0,0,0] """
-
-    
+def flatShader(**kwargs):    
     dLight = kwargs["dLight"]
-    normal= kwargs["triangleNormal"]
+    normal= kwargs["normals"]
     texCoords = kwargs["texCoords"]
     texture = kwargs["texture"]
 
@@ -78,7 +60,6 @@ def flatShader(**kwargs):
 
     else:
         return [0,0,0]
-
 
 def gouradShader(**kwargs):
     tA, tB, tC = kwargs["texCoords"]
@@ -119,65 +100,122 @@ def gouradShader(**kwargs):
 
 def customShader(**kwargs):
     tA, tB, tC = kwargs["texCoords"]
-    texture = kwargs["texture"]
+    textures = kwargs["textures"]
     nA, nB, nC = kwargs["normals"]
     u, v, w = kwargs["bCoords"]
     dLight = kwargs["dLight"]
 
-    b = 1.0
-    g = 1.0
-    r = 1.0
+    b= 1.0
+    g= 1.0
+    r= 1.0
 
-    if texture != None:
-        tU = u * tA[0] + v * tB[0] + w * tC[0]
-        tV = u * tA[1] + v * tB[1] + w * tC[1]
-        
-        textureColor = texture.getColor(tU, tV)    
-        b *= textureColor[2]
-        g *= textureColor[1]
-        r *= textureColor[0]
+    for texture in textures:
+        if texture != None:
+            tU= u * tA[0] + v * tB[0] + w * tC[0]
+            tV= u * tA[1] + v * tB[1] + w * tC[1]
+            
+            textureColor = texture.getColor(tU, tV)    
+            b *= textureColor[2]
+            g *= textureColor[1]
+            r *= textureColor[0]
 
-    normal = [u * nA[0] + v * nB[0] + w * nC[0],
-              u * nA[1] + v * nB[1] + w * nC[1],
-              u * nA[2] + v * nB[2] + w * nC[2]]
+    normal= [u * nA[0] + v * nB[0] + w * nC[0],
+             u * nA[1] + v * nB[1] + w * nC[1],
+             u * nA[2] + v * nB[2] + w * nC[2]]
     
-    dLight = vectorNegative(dLight)
-    intensity = dot(normal, dLight)
+    dLight= vectorNegative(dLight)
+    intensity= dot(normal, dLight)
     
-    #b *= intensity
-    #g *= intensity
-    #r *= intensity
-
-    grayscale_value = (r + g + b) / 3.0
-
-    return grayscale_value, grayscale_value, grayscale_value
+    b *= intensity
+    g *= intensity
+    r *= intensity
 
     if intensity > 0:
-        r = 1 - r
-        b = 1 - b
-        g = 1 - g
         return r, g, b
 
     else:
-        return [0, 0, 0]
+        return [0,0,0]
 
-def metallicShader(**kwargs):
-    viewDir = normVector(vectorNegative(kwargs["viewDir"]))
-    lightDir = normVector(vectorNegative(kwargs["lightDir"]))
-    normal = kwargs["normal"]
 
-    # Cálculo de reflexión especular usando el modelo de Phong
-    specular_intensity = dot(reflect(lightDir, normal), viewDir) ** 32  # Exponente de brillo ajustable
+def multiTextureShader(**kwargs):
+    tA, tB, tC = kwargs["texCoords"]
+    textures = kwargs["textures"]
+    u, v, w = kwargs["bCoords"]
 
-    # Valores para los canales de color
-    r = 0.8 + 0.2 * specular_intensity  # Componente roja con reflexión especular
-    g = 0.8 + 0.2 * specular_intensity  # Componente verde con reflexión especular
-    b = 0.8 + 0.2 * specular_intensity  # Componente azul con reflexión especular
+    b = 0
+    g = 0
+    r = 0
+
+    for texture in textures:
+        if texture != None:
+            tU= u * tA[0] + v * tB[0] + w * tC[0]
+            tV= u * tA[1] + v * tB[1] + w * tC[1]
+            
+            textureColor = texture.getColor(tU, tV)    
+            b += textureColor[2]
+            g += textureColor[1]
+            r += textureColor[0]
+
+    r /= len(textures)
+    g /= len(textures)
+    b /= len(textures)
 
     return r, g, b
 
-def reflect(v, n):
-    dot_product = 2 * dot(v, n)
-    return subtractVectors([v, multVectorScalar(n, dot_product)])
+def transparentShader(**kwargs):
+    tA, tB, tC = kwargs["texCoords"]
+    textures = kwargs["textures"]
+    nA, nB, nC = kwargs["normals"]
+    u, v, w = kwargs["bCoords"]
+    dLight = kwargs["dLight"]
+    viewDir = kwargs["camMatrix"]
 
+    normal = [u * nA[0] + v * nB[0] + w * nC[0],
+             u * nA[1] + v * nB[1] + w * nC[1],
+             u * nA[2] + v * nB[2] + w * nC[2]]
+
+    viewDir = [viewDir[0][2],
+                viewDir[1][2],
+                viewDir[2][2]]
+
+    dot_product = dot(normal, viewDir)
+
+    if dot_product <= 0:
+        dot_product = 0
+    
+    # Ajusta el nivel de opacidad basado en el producto de punto
+    # Si la normal está viendo hacia la cámara, se reduce la opacidad
+    opacity = 1.0 - max(0.0, dot_product)
+
+    r = 0.5 * opacity
+    g = 0.5 * opacity
+    b = 0.5 * opacity
+
+    return r, g, b
+
+
+def heightColorShader(**kwargs):
+    A, B, C = kwargs["vertex"]
+    camMatrix = kwargs["camMatrix"]
+
+    vt = [min(A[0], B[0], C[0]),
+            min(A[1], B[1], C[1]),
+            min(A[2], B[2], C[2]),
+            1]
+
+    vt = multMV(camMatrix, vt)
+
+    vt = [vt[0] / vt[3],
+            vt[1] / vt[3],
+            vt[2] / vt[3]]
+
+    # Normaliza la coordenada Z para que esté en el rango [0, 1]
+    normalized_z = (vt[2] + 1) / 2
+
+    # Interpola entre el color azul y rojo basado en la coordenada Z
+    r = normalized_z
+    g = 0
+    b = 1 - normalized_z
+
+    return r, g, b
 
