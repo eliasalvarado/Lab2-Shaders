@@ -198,37 +198,39 @@ class Renderer(object):
         B = verts[1]
         C = verts[2]
 
-        minX = round(min(A[0], B[0], C[0]))
-        minY = round(min(A[1], B[1], C[1]))
-        maxX = round(max(A[0], B[0], C[0]))
-        maxY = round(max(A[1], B[1], C[1]))
+        if A != None and B != None and C != None:
+            minX = round(min(A[0], B[0], C[0]))
+            minY = round(min(A[1], B[1], C[1]))
+            maxX = round(max(A[0], B[0], C[0]))
+            maxY = round(max(A[1], B[1], C[1]))
 
-        for x in range(minX, maxX + 1):
-            for y in range(minY, maxY + 1):
-                if (0 <= x < self.width) and (0 <= y < self.height):
-                    P = [x, y]
+            for x in range(minX, maxX + 1):
+                for y in range(minY, maxY + 1):
+                    if (0 <= x < self.width) and (0 <= y < self.height):
+                        P = [x, y]
 
-                    bCoords = bcCoords(A, B, C, P)
-                    
-                    if (bCoords != None):
-                        u, v, w = bCoords
+                        bCoords = bcCoords(A, B, C, P)
+                        
+                        if (bCoords != None):
+                            u, v, w = bCoords
 
-                        z = u * A[2] + v * B[2] + w * C[2]
+                            z = u * A[2] + v * B[2] + w * C[2]
 
-                        if(z < self.zBuffer[x][y]):
-                            self.zBuffer[x][y] = z
-                            
-                            if (self.fragmentShader != None):
-                                colorP = self.fragmentShader(texCoords = texCoords, 
-                                                            textures = self.activeTextures,
-                                                            normals = normals,
-                                                            bCoords = bCoords,
-                                                            dLight = self.directionalLight,
-                                                            camMatrix = self.camMatrix,
-                                                            vertex = [A, B, C])
-                                self.glPoint(x, y, color(colorP[0], colorP[1], colorP[2]))
-                            else:
-                                self.glPoint(x, y, self.currColor)
+                            if(z < self.zBuffer[x][y]):
+                                self.zBuffer[x][y] = z
+                                
+                                if (self.fragmentShader != None):
+                                    colorP = self.fragmentShader(texCoords = texCoords, 
+                                                                textures = self.activeTextures,
+                                                                normals = normals,
+                                                                bCoords = bCoords,
+                                                                dLight = self.directionalLight,
+                                                                camMatrix = self.camMatrix,
+                                                                vertex = [A, B, C],
+                                                                vCoords = [x, y, z])
+                                    self.glPoint(x, y, color(colorP[0], colorP[1], colorP[2]))
+                                else:
+                                    self.glPoint(x, y, self.currColor)
 
 
     def glAddVertices(self, verts):
@@ -294,11 +296,11 @@ class Renderer(object):
                     v3 = model.vertices[face[3][0] - 1]
                 
                 if self.vertexShader:
-                    v0 = self.vertexShader(v0, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix)
-                    v1 = self.vertexShader(v1, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix)
-                    v2 = self.vertexShader(v2, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix)
+                    v0 = self.vertexShader(v0, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix, height = self.height)
+                    v1 = self.vertexShader(v1, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix, height = self.height)
+                    v2 = self.vertexShader(v2, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix, height = self.height)
                     if vertCount == 4:
-                        v3 = self.vertexShader(v3, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix)
+                        v3 = self.vertexShader(v3, modelMatrix = mMatrix, viewMatrix = self.viewMatrix, projectionMatrix = self.projectionMatrix, vpMatrix = self.vpMatrix, height = self.height)
                 
                 tVerts.append(v0)
                 tVerts.append(v1)

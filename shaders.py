@@ -1,4 +1,5 @@
 from npPirata import multMV, multMM, dot, vectorNegative, normVector, multVectorScalar, subtractVectors, reflectVector, invertMatrix
+from random import random
 
 def vertexShader(vertex, **kwargs):
     modelMatrix = kwargs["modelMatrix"]
@@ -18,6 +19,37 @@ def vertexShader(vertex, **kwargs):
     vt = [vt[0] / vt[3],
         vt[1] / vt[3],
         vt[2] / vt[3]]
+
+    return vt
+
+def emptyBlocksVertexShader(vertex, **kwargs):
+    modelMatrix = kwargs["modelMatrix"]
+    viewMatrix = kwargs["viewMatrix"]
+    projectionMatrix = kwargs["projectionMatrix"]
+    vpMatrix = kwargs["vpMatrix"]
+    height = kwargs["height"]
+
+    vt = [vertex[0], 
+        vertex[1], 
+        vertex[2], 
+        1]
+
+    matrix = multMM([vpMatrix, projectionMatrix, viewMatrix, modelMatrix])
+    
+    vt = multMV(matrix, vt)
+
+    vt = [vt[0] / vt[3],
+        vt[1] / vt[3],
+        vt[2] / vt[3]]
+
+    bloques = []
+
+    for i in range(0, height, 50):
+        bloques.append((i, i + 15))
+
+    y = round(vt[1])
+    if any(start <= y <= end for start, end in bloques):
+        return None
 
     return vt
 
@@ -172,25 +204,36 @@ def multiTextureShader(**kwargs):
 
     return r, g, b
 
-def transparentShader(**kwargs):
+def heightColorShader(**kwargs):
     tA, tB, tC = kwargs["texCoords"]
     textures = kwargs["textures"]
     nA, nB, nC = kwargs["normals"]
     u, v, w = kwargs["bCoords"]
     dLight = kwargs["dLight"]
     viewDir = kwargs["camMatrix"]
+    A, B, C = kwargs["vertex"]
+    vCoords = kwargs["vCoords"]
 
     normal = [u * nA[0] + v * nB[0] + w * nC[0],
              u * nA[1] + v * nB[1] + w * nC[1],
              u * nA[2] + v * nB[2] + w * nC[2]]
 
-    viewDir = [viewDir[0][0],
-                viewDir[1][0],
-                viewDir[2][0]]
+    viewDir = [viewDir[0][1],
+                viewDir[1][1],
+                viewDir[2][1]]
+    
+    normal = normVector(normal)
 
-    """ viewDir = [(viewDir[0][1] + viewDir[0][0]) / 2,
-                (viewDir[1][1] + viewDir[1][0]) / 2,
-                (viewDir[2][1] + viewDir[2][0]) / 2] """
+    intensity = dot(normal, dLight)
+    intensity = max(0, min(intensity, 1))
+
+    viewDir = vectorNegative(viewDir)
+    reflection = reflectVector(dLight, normal)
+    specIntensity = dot(viewDir, reflection)
+    
+    specIntensity = max(0, min(specIntensity, 1))
+
+    r = b = g = specIntensity
 
     dot_product = dot(normal, viewDir)
 
@@ -208,10 +251,11 @@ def transparentShader(**kwargs):
             tU= u * tA[0] + v * tB[0] + w * tC[0]
             tV= u * tA[1] + v * tB[1] + w * tC[1]
             
-            textureColor = texture.getColor(tU, tV)  
-            b += textureColor[2]
+            textureColor = texture.getColor(tU, tV)    
+            height_factor = (normal[0] + normal[1] + normal[2]) / 3.0
+            r += max(0, min(1, textureColor[0] + height_factor))
             g += textureColor[1]
-            r += textureColor[0]
+            b += max(0, min(1, textureColor[2] - height_factor))
 
     r /= len(textures)
     g /= len(textures)
@@ -220,71 +264,6 @@ def transparentShader(**kwargs):
     r *= opacity
     g *= opacity
     b *= opacity
-
-    return r, g, b
-
-
-def heightColorShader(**kwargs):
-    tA, tB, tC = kwargs["texCoords"]
-    textures = kwargs["textures"]
-    nA, nB, nC = kwargs["normals"]
-    u, v, w = kwargs["bCoords"]
-    dLight = kwargs["dLight"]
-    viewDir = kwargs["camMatrix"]
-
-    # Calcula la normal interpolada del triángulo
-    normal = [
-        u * nA[0] + v * nB[0] + w * nC[0],
-        u * nA[1] + v * nB[1] + w * nC[1],
-        u * nA[2] + v * nB[2] + w * nC[2]
-    ]
-
-    viewDir = [viewDir[0][2],
-                viewDir[1][2],
-                viewDir[2][2]]
-
-    # Normaliza la normal interpolada
-    normal = normVector(normal)
-
-    # Calcula el producto punto entre la normal y la dirección de la luz
-    intensity = dot(normal, dLight)
-    
-    # Asegura que la intensidad esté en el rango [0, 1]
-    intensity = max(0, min(intensity, 1))
-
-    # Calcula la vista de dirección
-    viewDir = vectorNegative(viewDir)
-    reflection = reflectVector(dLight, normal)
-    specIntensity = dot(viewDir, reflection)
-    
-    # Asegura que la intensidad especular esté en el rango [0, 1]
-    specIntensity = max(0, min(specIntensity, 1))
-
-    # Interpola entre el color del material base y el color especular
-    base_color = [0.5, 0.5, 0.5]  # Color base del material
-    specular_color = [1.0, 1.0, 1.0]  # Color especular
-
-    # Interpola el color basado en la intensidad y el color especular
-    r = base_color[0] * (1 - specIntensity) + specular_color[0] * specIntensity
-    g = base_color[1] * (1 - specIntensity) + specular_color[1] * specIntensity
-    b = base_color[2] * (1 - specIntensity) + specular_color[2] * specIntensity
-
-    # Calcula los componentes de textura interpolados
-    for texture in textures:
-        if texture != None:
-            tU= u * tA[0] + v * tB[0] + w * tC[0]
-            tV= u * tA[1] + v * tB[1] + w * tC[1]
-            
-            textureColor = texture.getColor(tU, tV)    
-            height_factor = (normal[0] + normal[1] + normal[2]) / 3.0
-            r += max(0, min(1, textureColor[0] + height_factor))  # Red component
-            g += textureColor[1]
-            b += max(0, min(1, textureColor[2] - height_factor))
-
-    # Modula el color final por el color de textura
-    r /= len(textures)
-    g /= len(textures)
-    b /= len(textures)
 
     if (r > 1): r = 1
     if (g > 1): g = 1
@@ -300,11 +279,9 @@ def neonShader(**kwargs):
     dLight = kwargs["dLight"]
     viewDir = kwargs["camMatrix"]
 
-    normal = [
-        u * nA[0] + v * nB[0] + w * nC[0],
+    normal = [u * nA[0] + v * nB[0] + w * nC[0],
         u * nA[1] + v * nB[1] + w * nC[1],
-        u * nA[2] + v * nB[2] + w * nC[2]
-    ]
+        u * nA[2] + v * nB[2] + w * nC[2]]
 
     viewDir = [viewDir[0][2],
                 viewDir[1][2],
@@ -320,12 +297,7 @@ def neonShader(**kwargs):
     specIntensity = dot(viewDir, reflection)
     specIntensity = max(0, min(specIntensity, 1))
 
-    base_color = [0.0, 0.0, 0.0]  # Color base negro
-    specular_color = [1.0, 1.0, 1.0]  # Color especular blanco
-
-    r = base_color[0] * (1 - specIntensity) + specular_color[0] * specIntensity
-    g = base_color[1] * (1 - specIntensity) + specular_color[1] * specIntensity
-    b = base_color[2] * (1 - specIntensity) + specular_color[2] * specIntensity
+    r = b = g = specIntensity
 
     for texture in textures:
         if texture != None:
@@ -333,9 +305,9 @@ def neonShader(**kwargs):
             tV = u * tA[1] + v * tB[1] + w * tC[1]
             
             textureColor = texture.getColor(tU, tV)    
-            r += textureColor[0] * 2  # Aumenta el componente rojo
-            g += textureColor[1] * 2  # Aumenta el componente verde
-            b += textureColor[2] * 2  # Aumenta el componente azul
+            r += textureColor[0] * 2
+            g += textureColor[1] * 2
+            b += textureColor[2] * 2
 
     r /= len(textures)
     g /= len(textures)
@@ -347,7 +319,6 @@ def neonShader(**kwargs):
 
     return r, g, b
 
-
 def metallicShader(**kwargs):
     tA, tB, tC = kwargs["texCoords"]
     textures = kwargs["textures"]
@@ -356,11 +327,9 @@ def metallicShader(**kwargs):
     dLight = kwargs["dLight"]
     viewDir = kwargs["camMatrix"]
 
-    normal = [
-        u * nA[0] + v * nB[0] + w * nC[0],
-        u * nA[1] + v * nB[1] + w * nC[1],
-        u * nA[2] + v * nB[2] + w * nC[2]
-    ]
+    normal = [u * nA[0] + v * nB[0] + w * nC[0],
+                u * nA[1] + v * nB[1] + w * nC[1],
+                u * nA[2] + v * nB[2] + w * nC[2]]
 
     viewDir = [viewDir[0][2],
                 viewDir[1][2],
@@ -369,7 +338,6 @@ def metallicShader(**kwargs):
     normal = normVector(normal)
 
     intensity = dot(normal, dLight)
-    
     intensity = max(0, min(intensity, 1))
 
     viewDir = vectorNegative(viewDir)
@@ -378,11 +346,7 @@ def metallicShader(**kwargs):
     
     specIntensity = max(0, min(specIntensity, 1))
 
-    specular_color = [1.0, 1.0, 1.0]
-
-    r = 0
-    g = 0
-    b = 0
+    r = g = b = 0
 
     for texture in textures:
         if texture != None:
@@ -391,9 +355,9 @@ def metallicShader(**kwargs):
             
             textureColor = texture.getColor(tU, tV)  
             base_color = [textureColor[0], textureColor[1], textureColor[2]]  
-            r += base_color[0] * (1 - specIntensity) + specular_color[0] * specIntensity
-            g += base_color[1] * (1 - specIntensity) + specular_color[1] * specIntensity
-            b += base_color[2] * (1 - specIntensity) + specular_color[2] * specIntensity
+            r += base_color[0] * (1 - specIntensity) + specIntensity
+            g += base_color[1] * (1 - specIntensity) + specIntensity
+            b += base_color[2] * (1 - specIntensity) + specIntensity
 
     r /= len(textures)
     g /= len(textures)
