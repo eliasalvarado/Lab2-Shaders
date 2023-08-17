@@ -121,6 +121,11 @@ def multVectorScalar(vector, scalar):
     result = [scalar * value for value in vector]
     return result
 
+def reflectVector(vector, normal):
+    dot_product = dot(vector, normal)
+    reflection = [vector[i] - 2 * dot_product * normal[i] for i in range(len(vector))]
+    return reflection
+
 
 
 #prueba = [[1, 1, 0, 0], [0, -1, -2, 0], [0, 0, 1, -1], [0, 0, 0, 1]]

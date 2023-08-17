@@ -50,8 +50,8 @@ class Renderer(object):
         self.width = width
         self.height = height
 
-        #self.glClearColor(0.5, 0.5, 0.5)
-        self.glClearColor(0, 0, 0)
+        self.glClearColor(0.5, 0.5, 0.5)
+        #self.glClearColor(0, 0, 0)
         self.glClear()
 
         self.glColor(1, 1, 1)
@@ -69,7 +69,7 @@ class Renderer(object):
         self.glCamMatrix()
         self.glProjectionMatrix()
 
-        self.directionalLight = (1, 0, 0)
+        self.directionalLight = (1, 0, 1)
         
 
  
